@@ -77,6 +77,7 @@ impl FileSystem {
 
         let _n_directories = &self.directories.len();
 
+        let mut visits: i32 = 0;
 
         // stack of directories to visit 
         stack.push(u);
@@ -87,6 +88,7 @@ impl FileSystem {
         while !stack.is_empty() {
 
 
+            visits += 1;
             u = stack.pop().expect("Failed to pop stack");
 
             
@@ -172,30 +174,7 @@ impl FileSystem {
 
         }
 
-
-
-        // for dir_index in 0..n_directories {
-        //     
-        //     let mut size = 0;
-        //
-        //     // calculate size of files
-        //
-        //     for file in self.directories[dir_index].files.iter() {
-        //
-        //         size += file.size;
-        //     }
-        //
-        //     // calculate size of sub_directories
-        //     for (dir_name, sub_idx) in self.directories[dir_index].sub_directories.iter() {
-        //
-        //         size += self.directories[sub_idx.clone()].size.expect("folder_size not calculated");
-        //
-        //     }
-        //     self.directories[dir_index].size = Some(size);
-        //
-        //
-        //
-        // }
+        dbg!(&visits);
 
     }
 
@@ -363,4 +342,35 @@ fn main() {
     dbg!(&file_system.directories);
 
     println!("Total size of directories less than 100 000: {} bytes", total_size);
+
+    dbg!(&file_system.directories[0].size.unwrap());
+
+    let max_disk_space = 70000000;
+
+    let space_needed_for_update = 30000000;
+    
+    let storage_used = &file_system.directories[0].size.unwrap();
+
+    let space_free = max_disk_space - storage_used;
+
+    dbg!(&space_free);
+
+    let space_needed_to_be_deleted = space_needed_for_update - space_free;
+
+    dbg!(&space_needed_to_be_deleted);
+
+    let mut candidates_for_deletion: Vec<i32> = Vec::new();
+
+    for dir in file_system.directories {
+        let dir_size = dir.size.unwrap();
+
+        if dir_size >= space_needed_to_be_deleted {
+            candidates_for_deletion.push(dir_size);
+        }
+    }
+
+    candidates_for_deletion.sort();
+
+    dbg!(candidates_for_deletion[0]);
+
 }
