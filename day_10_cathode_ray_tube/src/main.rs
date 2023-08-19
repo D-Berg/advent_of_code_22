@@ -1,13 +1,54 @@
-use std::{fs::File ,error::Error, io::{BufReader, BufRead}};
+use std::{fs::File ,error::Error, io::{BufReader, BufRead}, usize, fmt::Display};
 use Instruction::*;
 
+
+const CRT_PIXEL_WIDTH: usize = 40;
+const CRT_PIXEL_HEIGHT: usize = 6;
+
+#[derive(Debug)]
+struct Crt {
+    display: [[bool; CRT_PIXEL_WIDTH]; CRT_PIXEL_HEIGHT]
+}
+
+impl Crt {
+    
+    fn new() -> Self {
+
+        Crt { display: [[false; CRT_PIXEL_WIDTH]; CRT_PIXEL_HEIGHT] }
+
+    }
+}
+
+impl Display for Crt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        
+        for i in 0..CRT_PIXEL_HEIGHT {
+            for j in 0..CRT_PIXEL_WIDTH {
+
+                if self.display[i][j] {
+
+                    write!(f, "#")?;
+                } else {
+                    write!(f, ".")?;
+                }
+
+            }
+            
+            write!(f, "\n")?;
+        }
+
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 struct Cpu {
     x: i32,
     cycle: i32,
+    stack: Vec<Instruction>,
     signal_strengths: Vec<i32>,
-    signal_strength_update_values: Vec<i32>
+    signal_strength_update_values: Vec<i32>,
+    crt: Crt,
 }
 
 impl Cpu {
@@ -18,62 +59,88 @@ impl Cpu {
         Cpu { 
             x: 1,
             cycle: 0,
+            stack: Vec::new(),
             signal_strengths: Vec::new(),
-            signal_strength_update_values
+            signal_strength_update_values,
+            crt: Crt::new()
         }
     }
 
+    fn push_instruction(&mut self, instruction: Instruction) {
 
-    fn execute_instruction(&mut self, instruct: Instruction) {
+        self.stack.push(instruction);
+
+    }
+
+    fn execute_stack(&mut self) {
+
+        self.stack.reverse();
+
+        // while their exists instruction on the stack
+        while !self.stack.is_empty() {
+
+            self.cycle += 1;
 
 
-        // check if cycle is 20th, 40th, ...
-        //
+            let instruction = self.stack.pop().unwrap();
 
-        match instruct {
+            println!("Start of cycle {}: register has value {}", &self.cycle, &self.x);
 
-            NOOP => {
+            if self.signal_strength_update_values.contains(&self.cycle) {
 
-                self.cycle += 1;
+                let signal_stength = self.cycle * self.x;
 
-                if self.signal_strength_update_values.contains(&self.cycle) {
-
-                    let signal_stength = self.cycle * self.x;
-
-                    self.signal_strengths.push(signal_stength);
-
-                }
-            }, 
-
-            ADDX(v) => {
-
-                for _ in 0..2 {
-
-                    self.cycle += 1;
-
-                    if self.signal_strength_update_values.contains(&self.cycle) {
-
-                        let signal_stength = self.cycle * self.x;
-
-                        self.signal_strengths.push(signal_stength);
-
-                    }
-
-                }
-
-                self.x += v;
+                self.signal_strengths.push(signal_stength);
 
             }
 
+            // dbg!(&instruction);
+            // dbg!(&self.cycle);
+            let p_y = (self.cycle - 1) / 40;
+            let p_x = (self.cycle - 1) % 40;
+
+            
+            dbg!(&p_y, &p_x);
+
+            let sprite_pos = vec![self.x -1, self.x, self.x + 1];
+
+            dbg!(&sprite_pos);
+
+            // sprite is visible
+            if sprite_pos.contains(&p_x) {
+                self.crt.display[p_y as usize][p_x as usize] = true;
+            } 
+
+            match instruction {
+                
+                NOOP => {},
+                ADDX(info) => {
+
+                    if info.0 > 0 {
+                        self.stack.push( ADDX( (0, info.1) ) );
+                    } else {
+                        self.x += info.1;
+                    }
+                }
+            }
+
+            // execute instruction
+
+            println!("End of cycle {}: register has value {} \n", &self.cycle, &self.x);
+
+
+
 
         }
-        
+
     }
+
 }
 
+#[derive(Debug)]
 enum Instruction {
     NOOP,
-    ADDX(i32)
+    ADDX((i32, i32)) // first value is number of instructions to complete, second is v.
 }
 
 fn main() -> Result<(), Box<dyn Error + 'static>> {
@@ -84,6 +151,8 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
     let reader = BufReader::new(file);
 
     let mut cpu = Cpu::new();
+
+    // add instructions to cpu stack
     for line in reader.lines() {
 
         let line_string = line?;
@@ -93,14 +162,14 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         match line_split[0] {
             "noop" => {
 
-                cpu.execute_instruction(Instruction::NOOP);
+                cpu.push_instruction(Instruction::NOOP);
 
             },
 
             "addx" => {
 
                 let v: i32 = line_split[1].parse()?;
-                cpu.execute_instruction(Instruction::ADDX(v));
+                cpu.push_instruction(Instruction::ADDX((1, v)));
 
             },
 
@@ -110,6 +179,11 @@ fn main() -> Result<(), Box<dyn Error + 'static>> {
         }
 
     }
+
+    cpu.execute_stack();
+
+    dbg!(&cpu.crt.display);
+    println!("{}", cpu.crt);
 
     let answer: i32 = cpu.signal_strengths.iter().sum();
     println!("{}", answer);
