@@ -1,4 +1,5 @@
-use std::{error::Error, fs::File, io::{BufReader, BufRead}, ops::{Add, Sub, Mul}, collections::HashMap};
+use core::fmt;
+use std::{error::Error, fs::File, io::{BufReader, BufRead, Write}, ops::{Add, Sub, Mul}, collections::HashMap, fmt::Display, vec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Point {
@@ -9,7 +10,7 @@ struct Point {
 impl Point {
     fn new(x: i32, y: i32) -> Self {
 
-        Point { x: x, y: y }
+        Point { x, y }
        
     }
 
@@ -29,17 +30,20 @@ enum Direction {
 
 #[derive(Debug)]
 struct Rope {
-    head_position: Point,
-    tail_position: Point,
+    knots: Vec<Point>,
     tail_history: HashMap<Point, usize>,
 }
 
 impl Rope {
     fn new() -> Rope {
+        let knots = vec![Point::new(0, 0); 10];
+        let mut tail_history: HashMap<Point, usize>= HashMap::new();
+        
+        tail_history.insert(Point::new(0, 0), 1);
+
         Rope { 
-            head_position: Point { x: 0, y: 0 },
-            tail_position: Point { x: 0, y: 0 },
-            tail_history: HashMap::new(),
+            knots,
+            tail_history 
 
         }
     }
@@ -55,40 +59,47 @@ impl Rope {
                 Direction::Left => Point::new(-1, 0)
             };
 
-            self.head_position = self.head_position + head_move_direction;
+            self.knots[0] = self.knots[0] + head_move_direction;
 
             // if the tail is two steps below, above, right or move_left
             // move tail in corresponding way.
 
-            let distance = self.head_position - self.tail_position;
+            for knot_idx in 1..self.knots.len() {
+                let distance = self.knots[knot_idx - 1] - self.knots[knot_idx];
+                let threshhold: f64 = 2.0;
 
-            let threshhold: f64 = 2.0;
+                let distance_norm = distance.norm();
+                // > sqrt(2)
+                // is not adjacent
+                if distance_norm > threshhold.sqrt() {
+                    // move tail
 
-            let distance_norm = distance.norm();
+                    // check if tail and head is in the same column 
 
-            // > sqrt(2)
-            // is not adjacent
-            if distance_norm > threshhold.sqrt() {
-                // move tail
+                    self.knots[knot_idx] = self.knots[knot_idx] + distance * 0.5;
 
-                // check if tail and head is in the same column 
+                    if knot_idx == (self.knots.len() - 1) {
 
-                self.tail_position = self.tail_position + distance * 0.5;
+                        match self.tail_history.get(&self.knots[knot_idx]) {
 
-                match self.tail_history.get(&self.tail_position) {
+                            Some(_) => {
 
-                    Some(_) => {
+                                *self.tail_history.get_mut(&self.knots[knot_idx]).unwrap() += 1;
+                            },
 
-                        *self.tail_history.get_mut(&self.tail_position).unwrap() += 1;
-                    },
+                            None => {
 
-                    None => {
-
-                        self.tail_history.insert(self.tail_position.clone(), 1);
+                                self.tail_history.insert(self.knots[knot_idx].clone(), 1);
+                            }
+                        }
                     }
-                }
 
-            } 
+
+                } 
+            }
+
+
+
 
             // dbg!(&self.head_position);
             // dbg!(&self.tail_position);
@@ -99,6 +110,40 @@ impl Rope {
 
 }
 
+
+impl Display for Rope {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+
+        let width: usize = 30;
+        let height: usize = 30;
+
+        let mut grid: Vec<Vec<char>> = vec![vec!['.'; width]; height];
+
+        let knot_symbols: Vec<char> = vec!['H', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+        for (knot_idx, knot) in self.knots.iter().enumerate() {
+
+            grid[knot.y as usize + 14][knot.x as usize + 14] = knot_symbols[knot_idx];
+
+        }
+
+        for i in (0..height).rev() {
+
+            for j in 0..width {
+
+                write!(f, "{}", grid[i][j]).expect("errorrrr");
+            }
+
+            write!(f, "\n").unwrap();
+
+        }
+
+        Ok(())
+
+    }
+
+}
 
 impl Add for Point {
     type Output = Self;
@@ -201,13 +246,14 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
                 panic!("move type should not exist");
             }
         }
+
+        // println!("{}", &rope);
     }
 
-    dbg!(&rope.head_position);
-    dbg!(&rope.tail_position);
 
     dbg!(&rope.tail_history.len());
 
+    // dbg!(&rope.knots);
     // dbg!(&rope.tail_history);
 
     Ok(())
