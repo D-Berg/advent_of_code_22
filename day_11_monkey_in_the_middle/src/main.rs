@@ -1,32 +1,44 @@
 use std::{fs::File, io::{BufReader, BufRead}, error::Error, usize};
 
 
-type WorryLevel = u32;
-type MonkeyIndex = usize;
-type Denominator = u32;
-type Operation = Vec<Term>;
+// type WorryLevel = u32;
+// type MonkeyIndex = usize;
+// type Denominator = u32;
 
 #[derive(Debug)]
 enum Term {
-    Multiplication, 
-    Addition,
-    Number(i32),
+    Number(u32),
     Old,
+    None
+}
+
+#[derive(Debug)]
+enum Operation {
+    Multiplication,
+    Addition,
+    None
 }
 
 
+#[derive(Debug)]
+struct Forumula {
+    left_term: Term,
+    right_term: Term,
+    op: Operation
+}
 
 #[derive(Debug)]
 struct Item {
-    worry_level: WorryLevel
+    worry_level: u32,
 }
 
 #[derive(Debug)]
 struct Monkey {
     items: Vec<Item>,
-    operation: Vec<Term>,
-    test: Denominator,
-    if_false_true: (MonkeyIndex, MonkeyIndex),
+    operation: Forumula,
+    test: u32,
+    if_false_true: (usize, usize),
+    inspections: u32
 }
 
 impl Monkey {
@@ -35,9 +47,14 @@ impl Monkey {
 
         Monkey { 
             items: Vec::new(), 
-            operation: Vec::new(),
+            operation: Forumula { 
+                left_term: Term::None,
+                right_term: Term::None,
+                op: Operation::None
+            },
             test: 0, 
-            if_false_true: (0, 0)
+            if_false_true: (0, 0),
+            inspections: 0
         }
         
 
@@ -76,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
 
     let mut monkey_group: MonkeyGroup = MonkeyGroup::new();
 
-    let mut monkey_idx: MonkeyIndex = 0;
+    let mut monkey_idx: usize = 0;
 
     // we know they are 7 monkeys
 
@@ -112,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
 
                 for i in 2..line_split.len() {
 
-                    let worry_level: WorryLevel = line_split[i]
+                    let worry_level: u32 = line_split[i]
                         .parse()
                         .unwrap();
 
@@ -129,59 +146,49 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
 
             "Operation:" => {
 
-                for i in 3..line_split.len() {
 
-                    match line_split[i] {
+                let left_term: Term = match line_split[3] {
 
-                        "old" => {
-
-                            monkey_group
-                                .monkeys[monkey_idx]
-                                .operation
-                                .push(Term::Old);
-
-                        },
-
-                        "+" => {
-
-                            monkey_group
-                                .monkeys[monkey_idx]
-                                .operation
-                                .push(Term::Addition);
-                    
-
-                        },
-
-                        "*" => {
-
-                            monkey_group
-                                .monkeys[monkey_idx]
-                                .operation
-                                .push(Term::Multiplication);
-
-                        },
-
-                        _ => {
-
-                            let num: i32 = line_split[i].parse().unwrap();
-
-                            monkey_group
-                                .monkeys[monkey_idx]
-                                .operation
-                                .push(Term::Number(num));
-
-                        }
-
-
+                    "old" => Term::Old,
+                     _ => {
+                        let num = line_split[3]
+                            .parse()
+                            .expect("Failed to parse num for op");
+                        Term::Number(num)
                     }
 
+                };
+
+
+                let op: Operation = match line_split[4] {
+                    "+" => Operation::Addition,
+                    "*" => Operation::Multiplication,
+                    _ => panic!("Operation do not exist"),
+                };
+
+                let right_term: Term = match line_split[5] {
+                    "old" => Term::Old,
+                    _ => {
+                        let num = line_split[5]
+                            .parse()
+                            .expect("Failed to parse num for op lhs");
+
+                        Term::Number(num)
+                    }
+                };
+
+                monkey_group.monkeys[monkey_idx].operation = Forumula {
+                    left_term,
+                    right_term,
+                    op
                 }
+
 
             },
 
             "Test:" => {
 
-                let test_val: Denominator = line_split
+                let test_val: u32 = line_split
                     .last()
                     .unwrap()
                     .parse()
@@ -196,7 +203,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
                 match line_split[1] {
                     "true:" => {
 
-                        let true_val: MonkeyIndex = line_split
+                        let true_val: usize = line_split
                             .last()
                             .unwrap()
                             .parse()
@@ -208,7 +215,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
 
                     "false:" => {
 
-                        let false_val: MonkeyIndex = line_split
+                        let false_val: usize = line_split
                             .last()
                             .unwrap()
                             .parse()
@@ -241,8 +248,135 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
     dbg!(&monkey_group.monkeys);
 
     // COMPUTING 
-
     
+
+    let num_rounds: usize = 20;
+
+    for round in 0..num_rounds {
+
+        println!("Round {}", round + 1);
+        
+
+        for monkey_idx in 0..monkey_group.monkeys.len() {
+
+
+            println!("   Monkey {} starts inspecting...", &monkey_idx + 1);
+            // inspect items 
+            
+            monkey_group.monkeys[monkey_idx].items.reverse();
+
+            while !monkey_group.monkeys[monkey_idx].items.is_empty() {
+
+                // 1. look at item 
+                monkey_group.monkeys[monkey_idx].inspections += 1;
+                // 2. do operation on item
+                
+                let old_worry_lvl = &monkey_group
+                    .monkeys[monkey_idx]
+                    .items
+                    .pop()
+                    .unwrap()
+                    .worry_level;
+
+                println!("      Inspecting item with worry level: {}", &old_worry_lvl);
+
+                let left: u32 = match monkey_group.monkeys[monkey_idx].operation.left_term {
+                    Term::Number(num) => num,
+                    Term::Old => old_worry_lvl.clone(),
+                    Term::None => panic!("wrong input")
+                };
+
+
+                let right: u32 = match monkey_group.monkeys[monkey_idx].operation.right_term {
+                    Term::Number(num) => num,
+                    Term::Old => old_worry_lvl.clone(),
+                    Term::None => panic!("wrong input")
+                };
+
+
+                let mut new_worry_level: u32 = match &monkey_group.monkeys[monkey_idx].operation.op {
+
+                    Operation::Addition => left + right,
+
+                    Operation::Multiplication => left * right,
+
+                    Operation::None => panic!("Operation None: Should not exist")
+                    
+                };
+                    
+                println!("      new worry_level: {}", &new_worry_level);
+
+                new_worry_level = new_worry_level / 3;
+
+                println!("      devides by 3: {}", &new_worry_level);
+
+                // 3. do test: devide by Denominator
+
+                let test = monkey_group.monkeys[monkey_idx].test;
+
+                println!("      Test: {}", &test);
+
+                if new_worry_level % test == 0 { 
+
+                    let monkey_to_throw_to = monkey_group
+                        .monkeys[monkey_idx]
+                        .if_false_true.1;
+                    
+                    println!("      Test is true, throwing to monkey {}", &monkey_to_throw_to);
+
+                    monkey_group
+                        .monkeys[monkey_to_throw_to]
+                        .items
+                        .push(
+                            Item { 
+                                worry_level: new_worry_level 
+                            }
+                        );
+
+                } else {
+                    
+                    let monkey_to_throw_to = monkey_group
+                        .monkeys[monkey_idx]
+                        .if_false_true.0;
+
+                    println!("      Test is false, throwing to monkey {}", &monkey_to_throw_to);
+                    monkey_group
+                        .monkeys[monkey_to_throw_to]
+                        .items
+                        .push(
+                            Item { 
+                                worry_level: new_worry_level 
+                            }
+                        );
+
+                }
+                
+                
+
+
+
+            }
+
+        }
+
+    }
+
+    // dbg!(&monkey_group.monkeys);
+
+    let mut monkey_inspections: Vec<u32> = Vec::new();
+
+    for monkey in monkey_group.monkeys {
+        monkey_inspections.push(monkey.inspections);
+    }
+
+    dbg!(&monkey_inspections);
+
+    monkey_inspections.sort();
+    monkey_inspections.reverse();
+
+    let monkey_business = monkey_inspections[0] * monkey_inspections[1];
+    
+    println!("Level of monkey business: {}", monkey_business);
     Ok(())
 }
 
