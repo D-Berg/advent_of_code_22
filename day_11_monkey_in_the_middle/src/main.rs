@@ -1,13 +1,12 @@
 use std::{fs::File, io::{BufReader, BufRead}, error::Error, usize};
 
+// Product of all tests
 
-// type WorryLevel = u32;
-// type MonkeyIndex = usize;
-// type Denominator = u32;
+const SUPER_MOD: u64 = 9699690; 
 
 #[derive(Debug)]
 enum Term {
-    Number(u32),
+    Number(u64),
     Old,
     None
 }
@@ -29,16 +28,16 @@ struct Forumula {
 
 #[derive(Debug)]
 struct Item {
-    worry_level: u32,
+    worry_level: u64,
 }
 
 #[derive(Debug)]
 struct Monkey {
     items: Vec<Item>,
     operation: Forumula,
-    test: u32,
+    test: u64,
     if_false_true: (usize, usize),
-    inspections: u32
+    inspections: u64,
 }
 
 impl Monkey {
@@ -83,7 +82,6 @@ impl MonkeyGroup {
 }
 
 fn main() -> Result<(), Box<dyn Error + 'static>>{
-    println!("Hello, world!");
 
     let path = "input.txt";
 
@@ -129,7 +127,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
 
                 for i in 2..line_split.len() {
 
-                    let worry_level: u32 = line_split[i]
+                    let worry_level: u64 = line_split[i]
                         .parse()
                         .unwrap();
 
@@ -188,7 +186,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
 
             "Test:" => {
 
-                let test_val: u32 = line_split
+                let test_val: u64 = line_split
                     .last()
                     .unwrap()
                     .parse()
@@ -250,17 +248,17 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
     // COMPUTING 
     
 
-    let num_rounds: usize = 20;
+    let num_rounds: usize = 10000;
 
     for round in 0..num_rounds {
 
-        println!("Round {}", round + 1);
+        // println!("Round {}", round + 1);
         
 
         for monkey_idx in 0..monkey_group.monkeys.len() {
 
 
-            println!("   Monkey {} starts inspecting...", &monkey_idx + 1);
+            // println!("   Monkey {} starts inspecting...", &monkey_idx + 1);
             // inspect items 
             
             monkey_group.monkeys[monkey_idx].items.reverse();
@@ -278,23 +276,23 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
                     .unwrap()
                     .worry_level;
 
-                println!("      Inspecting item with worry level: {}", &old_worry_lvl);
+                // println!("      Inspecting item with worry level: {}", &old_worry_lvl);
 
-                let left: u32 = match monkey_group.monkeys[monkey_idx].operation.left_term {
+                let left: u64 = match monkey_group.monkeys[monkey_idx].operation.left_term {
                     Term::Number(num) => num,
                     Term::Old => old_worry_lvl.clone(),
                     Term::None => panic!("wrong input")
                 };
 
 
-                let right: u32 = match monkey_group.monkeys[monkey_idx].operation.right_term {
+                let right: u64 = match monkey_group.monkeys[monkey_idx].operation.right_term {
                     Term::Number(num) => num,
                     Term::Old => old_worry_lvl.clone(),
                     Term::None => panic!("wrong input")
                 };
 
 
-                let mut new_worry_level: u32 = match &monkey_group.monkeys[monkey_idx].operation.op {
+                let mut new_worry_level: u64 = match &monkey_group.monkeys[monkey_idx].operation.op {
 
                     Operation::Addition => left + right,
 
@@ -304,17 +302,16 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
                     
                 };
                     
-                println!("      new worry_level: {}", &new_worry_level);
+                // println!("      new worry_level: {}", &new_worry_level);
 
-                new_worry_level = new_worry_level / 3;
-
-                println!("      devides by 3: {}", &new_worry_level);
 
                 // 3. do test: devide by Denominator
 
                 let test = monkey_group.monkeys[monkey_idx].test;
+                
+                new_worry_level = new_worry_level % SUPER_MOD;
 
-                println!("      Test: {}", &test);
+                // println!("      Test: {}", &test);
 
                 if new_worry_level % test == 0 { 
 
@@ -322,7 +319,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
                         .monkeys[monkey_idx]
                         .if_false_true.1;
                     
-                    println!("      Test is true, throwing to monkey {}", &monkey_to_throw_to);
+                    // println!("      Test is true, throwing to monkey {}", &monkey_to_throw_to);
 
                     monkey_group
                         .monkeys[monkey_to_throw_to]
@@ -339,7 +336,7 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
                         .monkeys[monkey_idx]
                         .if_false_true.0;
 
-                    println!("      Test is false, throwing to monkey {}", &monkey_to_throw_to);
+                    // println!("      Test is false, throwing to monkey {}", &monkey_to_throw_to);
                     monkey_group
                         .monkeys[monkey_to_throw_to]
                         .items
@@ -361,9 +358,9 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
 
     }
 
-    // dbg!(&monkey_group.monkeys);
+    dbg!(&monkey_group.monkeys);
 
-    let mut monkey_inspections: Vec<u32> = Vec::new();
+    let mut monkey_inspections: Vec<u64> = Vec::new();
 
     for monkey in monkey_group.monkeys {
         monkey_inspections.push(monkey.inspections);
@@ -374,30 +371,10 @@ fn main() -> Result<(), Box<dyn Error + 'static>>{
     monkey_inspections.sort();
     monkey_inspections.reverse();
 
+    dbg!(&monkey_inspections);
     let monkey_business = monkey_inspections[0] * monkey_inspections[1];
     
     println!("Level of monkey business: {}", monkey_business);
     Ok(())
 }
-
-#[cfg(test)]
-mod test {
-    use crate::{WorryLevel, Operation, Term::*};
-
-
-    #[test]
-    fn test_operation() {
-    
-        let item: WorryLevel = 10;
-        
-        let mut test_op: Operation = Operation::new();
-
-        test_op.push(Old);
-        test_op.push(Addition);
-        test_op.push(Number(2));
-
-        
-    }
-}
-
 
